@@ -82,7 +82,6 @@ class Node:
         self.f      = 0
         self.parent = None
 
-    # Heap comparison – tie-break on h so both GBFS and A* work naturally
     def __lt__(self, other):
         if self.f == other.f:
             return self.h < other.h
@@ -96,3 +95,133 @@ class Node:
 
     def pos(self):
         return (self.row, self.col)
+
+
+# ════════════════════════════════════════════════════════════════
+#  HEURISTICS
+# ════════════════════════════════════════════════════════════════
+def manhattan(r1, c1, r2, c2) -> float:
+    return abs(r1 - r2) + abs(c1 - c2)
+
+def euclidean(r1, c1, r2, c2) -> float:
+    return math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2)
+
+
+# ════════════════════════════════════════════════════════════════
+#  SEARCH ALGORITHMS  (generator – yield for step visualisation)
+# ════════════════════════════════════════════════════════════════
+def get_neighbors(grid, rows, cols, node):
+    """Return 4-connected non-wall neighbours."""
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for dr, dc in directions:
+        nr, nc = node.row + dr, node.col + dc
+        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] != WALL:
+            yield (nr, nc)
+
+def gbfs(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
+    """Greedy Best-First Search"""
+    t0 = time.perf_counter()
+    start_node = Node(*start_pos)
+    goal_r, goal_c = goal_pos
+    start_node.h = heuristic_fn(start_node.row, start_node.col, goal_r, goal_c)
+    start_node.f = start_node.h
+
+    open_heap   = [start_node]
+    open_set    = {start_pos: start_node}
+    closed_set  = set()
+    nodes_visited = 0
+
+    while open_heap:
+        current = heapq.heappop(open_heap)
+        pos = current.pos()
+
+        if pos in closed_set: continue
+        closed_set.add(pos)
+        nodes_visited += 1
+
+        if pos != start_pos and pos != goal_pos:
+            grid[current.row][current.col] = VISITED
+
+        frontier_poses = set(open_set.keys()) - closed_set
+        yield (frontier_poses, closed_set.copy())
+
+        if pos == goal_pos:
+            path = []
+            node = current
+            while node:
+                path.append(node.pos())
+                node = node.parent
+            path.reverse()
+            elapsed = (time.perf_counter() - t0) * 1000
+            yield ("DONE", path, nodes_visited, len(path) - 1, elapsed)
+            return
+
+        for nr, nc in get_neighbors(grid, rows, cols, current):
+            npos = (nr, nc)
+            if npos in closed_set: continue
+            if npos not in open_set:
+                child = Node(nr, nc)
+                child.h = heuristic_fn(nr, nc, goal_r, goal_c)
+                child.f = child.h
+                child.parent = current
+                open_set[npos] = child
+                heapq.heappush(open_heap, child)
+                if npos != goal_pos: grid[nr][nc] = FRONTIER
+
+    elapsed = (time.perf_counter() - t0) * 1000
+    yield ("NO_PATH", [], nodes_visited, 0, elapsed)
+
+def astar(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
+    """A* Search"""
+    t0 = time.perf_counter()
+    start_node = Node(*start_pos)
+    goal_r, goal_c = goal_pos
+    start_node.h = heuristic_fn(start_node.row, start_node.col, goal_r, goal_c)
+    start_node.f = start_node.h
+
+    open_heap   = [start_node]
+    open_set    = {start_pos: start_node}
+    closed_set  = set()
+    nodes_visited = 0
+
+    while open_heap:
+        current = heapq.heappop(open_heap)
+        pos = current.pos()
+
+        if pos in closed_set: continue
+        closed_set.add(pos)
+        nodes_visited += 1
+
+        if pos != start_pos and pos != goal_pos:
+            grid[current.row][current.col] = VISITED
+
+        frontier_poses = set(open_set.keys()) - closed_set
+        yield (frontier_poses, closed_set.copy())
+
+        if pos == goal_pos:
+            path = []
+            node = current
+            while node:
+                path.append(node.pos())
+                node = node.parent
+            path.reverse()
+            elapsed = (time.perf_counter() - t0) * 1000
+            yield ("DONE", path, nodes_visited, len(path) - 1, elapsed)
+            return
+
+        for nr, nc in get_neighbors(grid, rows, cols, current):
+            npos = (nr, nc)
+            if npos in closed_set: continue
+            tentative_g = current.g + 1
+            if npos not in open_set or tentative_g < open_set[npos].g:
+                child = Node(nr, nc)
+                child.g = tentative_g
+                child.h = heuristic_fn(nr, nc, goal_r, goal_c)
+                child.f = child.g + child.h
+                child.parent = current
+                open_set[npos] = child
+                heapq.heappush(open_heap, child)
+                if npos != goal_pos: grid[nr][nc] = FRONTIER
+
+    elapsed = (time.perf_counter() - t0) * 1000
+    yield ("NO_PATH", [], nodes_visited, 0, elapsed)
