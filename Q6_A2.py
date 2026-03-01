@@ -213,3 +213,115 @@ class PathfinderApp:
         if 0 <= row < self.rows and 0 <= col < self.cols:
             return (row, col)
         return None
+
+# ─── SEARCH INTEGRATION ────────────────────────────────────
+    def _start_search(self, from_pos=None):
+        self._clear_search_overlay()
+        self.path         = []
+        self.agent_pos    = None
+        self.agent_idx    = 0
+        self.is_running   = False
+        self.no_path_flag = False
+
+        src = from_pos or self.start_pos
+        h_fn = manhattan if self.heur_key == "manhattan" else euclidean
+        algo = gbfs if self.algo_key == "gbfs" else astar
+
+        # Make a working copy of the grid for the search to annotate
+        self.search_gen     = algo(self.grid, self.rows, self.cols,
+                                   src, self.goal_pos, h_fn)
+        self.is_searching   = True
+        self.status_msg     = "Searching…"
+        self.status_color   = WARNING
+        self.last_search_t  = pygame.time.get_ticks()
+
+    def _finish_search(self, path, nv, pc, et):
+        self.nodes_visited  = nv
+        self.path_cost      = pc
+        self.exec_time_ms   = et
+        self.path           = path
+        self.is_searching   = False
+
+        if path:
+            self._paint_path()
+            self.status_msg   = f"Path found!  Cost={pc}  Nodes={nv}  {et:.1f} ms"
+            self.status_color = SUCCESS
+        else:
+            self.no_path_flag = True
+            self.status_msg   = "No path found to goal."
+            self.status_color = DANGER
+
+    def _replan(self):
+        """Re-run search from current agent position."""
+        self.replan_count += 1
+        self._clear_search_overlay()
+        self._start_search(from_pos=self.agent_pos)
+        self.status_msg = f"Re-planning… (replan #{self.replan_count})"
+
+    # ─── DYNAMIC OBSTACLES ─────────────────────────────────────
+    def _spawn_obstacle(self):
+        if not self.dynamic_mode:
+            return
+        if random.random() > self.SPAWN_PROB:
+            return
+        # Pick a random non-special cell
+        r = random.randint(0, self.rows - 1)
+        c = random.randint(0, self.cols - 1)
+        pos = (r, c)
+        if (pos == self.start_pos or pos == self.goal_pos or
+                pos == self.agent_pos or
+                self.grid[r][c] in (WALL, START, GOAL, AGENT)):
+            return
+        self.grid[r][c] = WALL
+        # Check if it blocks the remaining path
+        if self.path and pos in self.path[self.agent_idx:]:
+            self._replan()
+
+    # ─── AGENT MOVEMENT ────────────────────────────────────────
+    def _start_agent(self):
+        if not self.path or len(self.path) < 2:
+            return
+        self.is_running   = True
+        self.agent_idx    = 0
+        self.agent_pos    = self.path[0]
+        self.replan_count = 0
+        self.last_agent_t = pygame.time.get_ticks()
+        self._clear_search_overlay()
+        self._paint_path()
+        self.status_msg   = "Agent moving…"
+        self.status_color = ACCENT
+
+    def _step_agent(self):
+        if not self.is_running or self.is_searching:
+            return
+        now = pygame.time.get_ticks()
+        if now - self.last_agent_t < self.AGENT_STEP_MS:
+            return
+        self.last_agent_t = now
+
+        self._spawn_obstacle()
+        if self.is_searching:   # spawn triggered replan
+            return
+
+        if self.agent_idx >= len(self.path) - 1:
+            # Reached goal
+            self.is_running = False
+            gr, gc = self.goal_pos
+            self.grid[gr][gc] = GOAL
+            self.status_msg   = (f"Goal reached!  Cost={self.path_cost}"
+                                  f"  Re-plans={self.replan_count}")
+            self.status_color = SUCCESS
+            return
+
+        # Un-mark previous cell
+        pr, pc = self.path[self.agent_idx]
+        if (pr, pc) != self.start_pos:
+            self.grid[pr][pc] = VISITED
+
+        self.agent_idx += 1
+        self.agent_pos  = self.path[self.agent_idx]
+        ar, ac = self.agent_pos
+        if (ar, ac) != self.goal_pos:
+            self.grid[ar][ac] = AGENT
+        else:
+            self.grid[ar][ac] = GOAL
