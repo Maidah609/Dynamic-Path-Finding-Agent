@@ -22,10 +22,3 @@ This repository contains the source code for the **Dynamic Pathfinding Agent**, 
 * Python 3.7+
 * `pygame` (for the main simulation GUI)
 * `tkinter` (Standard Python library, used for the initial settings dialog)
-
-## Installation
-
-1. Clone this repository:
-   ```bash
-   git clone [https://github.com/yourusername/dynamic-pathfinding-agent.git](https://github.com/yourusername/dynamic-pathfinding-agent.git)
-   cd dynamic-pathfinding-agent
