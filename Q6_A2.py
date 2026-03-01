@@ -325,3 +325,146 @@ class PathfinderApp:
             self.grid[ar][ac] = AGENT
         else:
             self.grid[ar][ac] = GOAL
+# ─── BUTTONS ───────────────────────────────────────────────
+    def _build_buttons(self):
+        self.buttons = {}
+        bx = self.grid_px_w + 14
+        bw = PANEL_W - 28
+        bh = 34
+
+        def reg(key, label, y, color=PANEL_LIGHT):
+            rect = pygame.Rect(bx, y, bw, bh)
+            self.buttons[key] = {"rect": rect, "label": label, "color": color}
+
+        reg("search",   "▶  Start Search",       198, (30, 120, 80))
+        reg("run",      "⚡  Run Agent",          240, (20,  90, 170))
+        reg("regen",    "⟳  Random Map",          294)
+        reg("clear",    "✕  Clear Map",           336)
+        reg("reset",    "↺  Full Reset",          378)
+        reg("dynamic",  "◉  Dynamic Mode: OFF",   430, DARK_GRAY)
+        reg("algo",     f"Algo: {self._algo_label()}",  494, PANEL_LIGHT)
+        reg("heur",     f"Heur: {self._heur_label()}",  536, PANEL_LIGHT)
+        reg("mode_wall","Place: Wall",             594, PANEL_LIGHT)
+        reg("mode_start","Set Start",             634, PANEL_LIGHT)
+        reg("mode_goal", "Set Goal",              674, PANEL_LIGHT)
+
+    def _algo_label(self):
+        return "A*" if self.algo_key == "astar" else "GBFS"
+
+    def _heur_label(self):
+        return "Manhattan" if self.heur_key == "manhattan" else "Euclidean"
+
+    def _handle_button(self, key):
+        if key == "search":
+            if not self.is_running: self._start_search()
+        elif key == "run":
+            if self.path and not self.is_searching:
+                if not self.is_running: self._start_agent()
+                else:
+                    self.is_running = False
+                    self.status_msg = "Agent paused."
+                    self.status_color = DIM_TEXT
+        elif key == "regen":
+            self.is_running = self.is_searching = False
+            self.path = []
+            self._generate_random_map()
+            self.status_msg   = "New random map generated."
+            self.status_color = DIM_TEXT
+        elif key == "clear":
+            self.is_running = self.is_searching = False
+            self.path = []
+            self._reset_grid()
+            self.status_msg   = "Map cleared."
+            self.status_color = DIM_TEXT
+        elif key == "reset":
+            self.is_running = self.is_searching = False
+            self.path = []; self.nodes_visited = 0
+            self.path_cost = 0; self.exec_time_ms = 0
+            self.replan_count = 0; self.no_path_flag = False
+            self._reset_grid()
+            self.status_msg   = "Reset complete."
+            self.status_color = DIM_TEXT
+        elif key == "dynamic":
+            self.dynamic_mode = not self.dynamic_mode
+            lbl = "ON" if self.dynamic_mode else "OFF"
+            col = SUCCESS if self.dynamic_mode else DARK_GRAY
+            self.buttons["dynamic"]["label"] = f"◉  Dynamic Mode: {lbl}"
+            self.buttons["dynamic"]["color"] = col
+        elif key == "algo":
+            self.algo_key = "gbfs" if self.algo_key == "astar" else "astar"
+            self.buttons["algo"]["label"] = f"Algo: {self._algo_label()}"
+        elif key == "heur":
+            self.heur_key = "euclidean" if self.heur_key == "manhattan" else "manhattan"
+            self.buttons["heur"]["label"] = f"Heur: {self._heur_label()}"
+        elif key == "mode_wall": self.placing_mode = "wall"
+        elif key == "mode_start": self.placing_mode = "start"
+        elif key == "mode_goal": self.placing_mode = "goal"
+
+    # ─── DRAWING ───────────────────────────────────────────────
+    def _draw_grid(self):
+        for r in range(self.rows):
+            for c in range(self.cols):
+                state = self.grid[r][c]
+                color = STATE_COLORS.get(state, C_EMPTY)
+                rect  = pygame.Rect(c * self.cs, r * self.cs, self.cs, self.cs)
+                pygame.draw.rect(self.screen, color,  rect)
+                if self.cs >= 6:
+                    pygame.draw.rect(self.screen, C_GRID, rect, 1)
+
+    def _draw_panel(self):
+        px = self.grid_px_w
+        pygame.draw.rect(self.screen, PANEL_COLOR, pygame.Rect(px, 0, PANEL_W, self.win_h))
+        pygame.draw.line(self.screen, BORDER_COL, (px, 0), (px, self.win_h), 2)
+        x = px + 14; y = 14
+
+        self._text(self.font_h1, "Pathfinding Agent", x, y, WHITE); y += 22
+        self._text(self.font_sm, "AI2002 – Assignment #2", x, y, DIM_TEXT); y += 24
+        pygame.draw.line(self.screen, BORDER_COL, (px+8, y), (px+PANEL_W-8, y)); y += 10
+
+        self._text(self.font_h2, "METRICS", x, y, DIM_TEXT); y += 20
+        self._metric_row(x, y, "Nodes Visited",  str(self.nodes_visited)); y += 22
+        self._metric_row(x, y, "Path Cost",       str(self.path_cost));     y += 22
+        self._metric_row(x, y, "Exec Time",       f"{self.exec_time_ms:.1f} ms"); y += 22
+        self._metric_row(x, y, "Re-plans",        str(self.replan_count));  y += 26
+
+        pygame.draw.line(self.screen, BORDER_COL, (px+8, y), (px+PANEL_W-8, y)); y += 10
+        self._text(self.font_h2, "CONTROLS", x, y, DIM_TEXT); y += 20
+
+        for key, btn in self.buttons.items():
+            is_active = (
+                (key == "dynamic" and self.dynamic_mode) or
+                (key == "mode_wall"  and self.placing_mode == "wall") or
+                (key == "mode_start" and self.placing_mode == "start") or
+                (key == "mode_goal"  and self.placing_mode == "goal")
+            )
+            col = btn["color"]
+            if is_active: col = ACCENT
+            pygame.draw.rect(self.screen, col, btn["rect"], border_radius=6)
+            pygame.draw.rect(self.screen, BORDER_COL, btn["rect"], 1, border_radius=6)
+            lbl_surf = self.font_reg.render(btn["label"], True, TEXT_COLOR)
+            lx = btn["rect"].x + (btn["rect"].w - lbl_surf.get_width()) // 2
+            ly = btn["rect"].y + (btn["rect"].h - lbl_surf.get_height()) // 2
+            self.screen.blit(lbl_surf, (lx, ly))
+
+        # Status bar at bottom
+        status_rect = pygame.Rect(px+6, self.win_h - 34, PANEL_W-12, 28)
+        pygame.draw.rect(self.screen, PANEL_LIGHT, status_rect, border_radius=5)
+        self._text_wrap(self.font_sm, self.status_msg, status_rect.x + 6, status_rect.y + 6, status_rect.w - 12, self.status_color)
+
+    def _metric_row(self, x, y, label, value):
+        self._text(self.font_sm, label + ":", x, y, DIM_TEXT)
+        surf = self.font_h2.render(value, True, WHITE)
+        self.screen.blit(surf, (x + 130, y))
+
+    def _text(self, font, txt, x, y, color):
+        self.screen.blit(font.render(txt, True, color), (x, y))
+
+    def _text_wrap(self, font, txt, x, y, max_w, color):
+        words = txt.split(); line  = ""
+        for w in words:
+            test = line + w + " "
+            if font.size(test)[0] > max_w and line:
+                self.screen.blit(font.render(line.strip(), True, color), (x, y)); y += font.get_height()
+                line = w + " "
+            else: line = test
+        if line: self.screen.blit(font.render(line.strip(), True, color), (x, y))
