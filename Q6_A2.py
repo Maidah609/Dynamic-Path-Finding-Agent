@@ -96,7 +96,6 @@ class Node:
     def pos(self):
         return (self.row, self.col)
 
-
 # ════════════════════════════════════════════════════════════════
 #  HEURISTICS
 # ════════════════════════════════════════════════════════════════
@@ -106,12 +105,10 @@ def manhattan(r1, c1, r2, c2) -> float:
 def euclidean(r1, c1, r2, c2) -> float:
     return math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2)
 
-
 # ════════════════════════════════════════════════════════════════
-#  SEARCH ALGORITHMS  (generator – yield for step visualisation)
+#  SEARCH ALGORITHMS  
 # ════════════════════════════════════════════════════════════════
 def get_neighbors(grid, rows, cols, node):
-    """Return 4-connected non-wall neighbours."""
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     for dr, dc in directions:
         nr, nc = node.row + dr, node.col + dc
@@ -119,7 +116,6 @@ def get_neighbors(grid, rows, cols, node):
             yield (nr, nc)
 
 def gbfs(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
-    """Greedy Best-First Search"""
     t0 = time.perf_counter()
     start_node = Node(*start_pos)
     goal_r, goal_c = goal_pos
@@ -134,26 +130,19 @@ def gbfs(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
     while open_heap:
         current = heapq.heappop(open_heap)
         pos = current.pos()
-
         if pos in closed_set: continue
         closed_set.add(pos)
         nodes_visited += 1
 
-        if pos != start_pos and pos != goal_pos:
-            grid[current.row][current.col] = VISITED
-
-        frontier_poses = set(open_set.keys()) - closed_set
-        yield (frontier_poses, closed_set.copy())
+        if pos != start_pos and pos != goal_pos: grid[current.row][current.col] = VISITED
+        yield (set(open_set.keys()) - closed_set, closed_set.copy())
 
         if pos == goal_pos:
             path = []
             node = current
-            while node:
-                path.append(node.pos())
-                node = node.parent
+            while node: path.append(node.pos()); node = node.parent
             path.reverse()
-            elapsed = (time.perf_counter() - t0) * 1000
-            yield ("DONE", path, nodes_visited, len(path) - 1, elapsed)
+            yield ("DONE", path, nodes_visited, len(path) - 1, (time.perf_counter() - t0) * 1000)
             return
 
         for nr, nc in get_neighbors(grid, rows, cols, current):
@@ -168,11 +157,9 @@ def gbfs(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
                 heapq.heappush(open_heap, child)
                 if npos != goal_pos: grid[nr][nc] = FRONTIER
 
-    elapsed = (time.perf_counter() - t0) * 1000
-    yield ("NO_PATH", [], nodes_visited, 0, elapsed)
+    yield ("NO_PATH", [], nodes_visited, 0, (time.perf_counter() - t0) * 1000)
 
 def astar(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
-    """A* Search"""
     t0 = time.perf_counter()
     start_node = Node(*start_pos)
     goal_r, goal_c = goal_pos
@@ -187,26 +174,19 @@ def astar(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
     while open_heap:
         current = heapq.heappop(open_heap)
         pos = current.pos()
-
         if pos in closed_set: continue
         closed_set.add(pos)
         nodes_visited += 1
 
-        if pos != start_pos and pos != goal_pos:
-            grid[current.row][current.col] = VISITED
-
-        frontier_poses = set(open_set.keys()) - closed_set
-        yield (frontier_poses, closed_set.copy())
+        if pos != start_pos and pos != goal_pos: grid[current.row][current.col] = VISITED
+        yield (set(open_set.keys()) - closed_set, closed_set.copy())
 
         if pos == goal_pos:
             path = []
             node = current
-            while node:
-                path.append(node.pos())
-                node = node.parent
+            while node: path.append(node.pos()); node = node.parent
             path.reverse()
-            elapsed = (time.perf_counter() - t0) * 1000
-            yield ("DONE", path, nodes_visited, len(path) - 1, elapsed)
+            yield ("DONE", path, nodes_visited, len(path) - 1, (time.perf_counter() - t0) * 1000)
             return
 
         for nr, nc in get_neighbors(grid, rows, cols, current):
@@ -223,5 +203,108 @@ def astar(grid, rows, cols, start_pos, goal_pos, heuristic_fn):
                 heapq.heappush(open_heap, child)
                 if npos != goal_pos: grid[nr][nc] = FRONTIER
 
-    elapsed = (time.perf_counter() - t0) * 1000
-    yield ("NO_PATH", [], nodes_visited, 0, elapsed)
+    yield ("NO_PATH", [], nodes_visited, 0, (time.perf_counter() - t0) * 1000)
+
+# ════════════════════════════════════════════════════════════════
+#  SETTINGS DIALOG  (Tkinter)
+# ════════════════════════════════════════════════════════════════
+class SettingsDialog:
+    def __init__(self):
+        self.result = None
+        self.root   = tk.Tk()
+        self.root.title("Dynamic Pathfinding Agent – Settings")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#1c1c1e")
+
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        style.configure("TLabel",       background="#1c1c1e", foreground="#e5e5ea", font=("Segoe UI", 10))
+        style.configure("Header.TLabel",background="#1c1c1e", foreground="#ffffff", font=("Segoe UI", 13, "bold"))
+        style.configure("TFrame",       background="#1c1c1e")
+        style.configure("TButton",      font=("Segoe UI", 10, "bold"), padding=6)
+        style.configure("TCombobox",    fieldbackground="#2c2c2e", background="#2c2c2e", foreground="#e5e5ea")
+        style.configure("TSpinbox",     fieldbackground="#2c2c2e", foreground="#e5e5ea")
+        style.map("TCombobox",          fieldbackground=[("readonly", "#2c2c2e")])
+
+        self._build()
+        self.root.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.root.eval("tk::PlaceWindow . center")
+        self.root.mainloop()
+
+    def _build(self):
+        pad = {"padx": 14, "pady": 6}
+
+        ttk.Label(self.root, text="Dynamic Pathfinding Agent", style="Header.TLabel").grid(
+            row=0, column=0, columnspan=2, pady=(18, 4), **{k: v for k, v in pad.items() if k == "padx"})
+        ttk.Label(self.root, text="AI2002 – Assignment #2", foreground="#8e8e93",
+                  background="#1c1c1e", font=("Segoe UI", 9)).grid(
+            row=1, column=0, columnspan=2, pady=(0, 14), **{k: v for k, v in pad.items() if k == "padx"})
+
+        sep = tk.Frame(self.root, height=1, bg="#3a3a3c"); sep.grid(
+            row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+
+        # Grid size
+        self._field(3, "Grid Rows:",    "rows_var",    tk.IntVar(value=25), 5, 60)
+        self._field(4, "Grid Columns:", "cols_var",    tk.IntVar(value=40), 5, 80)
+        self._field(5, "Obstacle Density (%):", "density_var", tk.IntVar(value=30), 0, 70)
+
+        # Algorithm
+        ttk.Label(self.root, text="Algorithm:").grid(row=6, column=0, sticky="e", **pad)
+        self.algo_var = tk.StringVar(value="A*")
+        cb_algo = ttk.Combobox(self.root, textvariable=self.algo_var,
+                               values=["A*", "Greedy Best-First (GBFS)"],
+                               state="readonly", width=26)
+        cb_algo.grid(row=6, column=1, sticky="w", **pad)
+
+        # Heuristic
+        ttk.Label(self.root, text="Heuristic:").grid(row=7, column=0, sticky="e", **pad)
+        self.heur_var = tk.StringVar(value="Manhattan")
+        cb_heur = ttk.Combobox(self.root, textvariable=self.heur_var,
+                                values=["Manhattan", "Euclidean"],
+                                state="readonly", width=26)
+        cb_heur.grid(row=7, column=1, sticky="w", **pad)
+
+        sep2 = tk.Frame(self.root, height=1, bg="#3a3a3c"); sep2.grid(
+            row=8, column=0, columnspan=2, sticky="ew", padx=14, pady=6)
+
+        # Buttons
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.grid(row=9, column=0, columnspan=2, pady=(4, 16))
+        tk.Button(btn_frame, text="Launch", width=12, bg="#0a84ff", fg="white",
+                  font=("Segoe UI", 10, "bold"), relief="flat",
+                  activebackground="#0060cc", activeforeground="white",
+                  command=self._launch).pack(side="left", padx=8)
+        tk.Button(btn_frame, text="Cancel", width=10, bg="#3a3a3c", fg="#e5e5ea",
+                  font=("Segoe UI", 10), relief="flat",
+                  activebackground="#4a4a4f", activeforeground="white",
+                  command=self._cancel).pack(side="left", padx=4)
+
+    def _field(self, row, label, attr, var, lo, hi):
+        pad = {"padx": 14, "pady": 6}
+        setattr(self, attr, var)
+        ttk.Label(self.root, text=label).grid(row=row, column=0, sticky="e", **pad)
+        sb = ttk.Spinbox(self.root, from_=lo, to=hi, textvariable=var, width=10)
+        sb.grid(row=row, column=1, sticky="w", **pad)
+
+    def _launch(self):
+        try:
+            rows    = int(self.rows_var.get())
+            cols    = int(self.cols_var.get())
+            density = int(self.density_var.get())
+            if not (5 <= rows <= 60): raise ValueError("Rows must be 5–60")
+            if not (5 <= cols <= 80): raise ValueError("Cols must be 5–80")
+            if not (0 <= density <= 70): raise ValueError("Density 0–70 %")
+        except Exception as e:
+            messagebox.showerror("Invalid Input", str(e)); return
+
+        self.result = {
+            "rows":      rows,
+            "cols":      cols,
+            "density":   density / 100,
+            "algorithm": "astar" if self.algo_var.get() == "A*" else "gbfs",
+            "heuristic": "manhattan" if self.heur_var.get() == "Manhattan" else "euclidean",
+        }
+        self.root.destroy()
+
+    def _cancel(self):
+        self.root.destroy()
