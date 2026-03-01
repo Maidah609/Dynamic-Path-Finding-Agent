@@ -2,8 +2,8 @@
 
 This repository contains the source code for the **Dynamic Pathfinding Agent**, developed for AI2002 – Assignment #2. It is a Python-based visualizer built with Pygame and Tkinter that demonstrates how informed search algorithms navigate grid-based environments, specifically when faced with dynamic, real-time obstacles.
 
-**Author:** Rayyan Asim  
-**Roll Number:** [Insert your XXF-YYYY Roll Number here]  
+**Author:** Maidah Nasir
+**Roll Number:** 23F-0764
 
 ## Features
 
