@@ -7,7 +7,7 @@ This repository contains the source code for the **Dynamic Pathfinding Agent**, 
 
 ## Features
 
-* **Informed Search Algorithms:** Implements both **A* Search** ($f(n) = g(n) + h(n)$) and **Greedy Best-First Search (GBFS)** ($f(n) = h(n)$).
+* **Informed Search Algorithms:** Implements both **A* Search** (f(n) = g(n) + h(n)) and **Greedy Best-First Search (GBFS)** (f(n) = h(n)).
 * **Heuristic Functions:** Supports toggling between **Manhattan Distance** and **Euclidean Distance** for cost estimation.
 * **Dynamic Grid Environment:** * Configurable grid dimensions (Rows x Columns).
   * Random map generation with user-defined obstacle density (e.g., 30%).
